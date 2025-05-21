@@ -1,112 +1,120 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import Splash from './pages/Splash';
 import VerificationSystem from './pages/SendEmail';
 import ProfileCompletion from './pages/CompleteRegister';
+import Dashboard from './pages/Dashboard';
+import NotFoundPage from './pages/NotfoundPage';
+import CustomRoutes from './routes/CustomRoutes';
 
-const App = () => {
-  const [currentPage, setCurrentPage] = useState('splash');
-  const [isLoading, setIsLoading] = useState(true);
+// Splash screen wrapper that shows splash for a specified time then redirects
+const SplashWrapper = () => {
+  const navigate = useNavigate();
+  const [showSplash, setShowSplash] = useState(true);
 
-  // Check authentication status on app load
   useEffect(() => {
-    const checkAuth = async () => {
-      // Simulate checking authentication
-      setIsLoading(true);
+    // First show splash screen with full opacity
+    setShowSplash(true);
 
-      try {
-        // Check if user is already verified and has a profile
-        const userData = localStorage.getItem('marsogramUser');
-        const verifiedEmail = localStorage.getItem('marsogramVerified');
+    // After 2 seconds, check auth and redirect
+    const timer = setTimeout(() => {
+      const userData = localStorage.getItem('marsogramUser');
+      const verifiedEmail = localStorage.getItem('marsogramVerified');
 
-        setTimeout(() => {
-          // If user has completed profile
-          if (userData) {
-            setCurrentPage('home'); // Would go to your app's home screen
-          }
-          // If user is verified but hasn't completed profile
-          else if (verifiedEmail) {
-            setCurrentPage('profile');
-          }
-          // If user has started the process but not verified
-          else if (localStorage.getItem('marsogramEmail')) {
-            setCurrentPage('verification');
-          }
-          // First time or logged out user
-          else {
-            setCurrentPage('splash');
-          }
-
-          setIsLoading(false);
-        }, 1500); // Simulate network delay
-      } catch (error) {
-        console.error('Auth check failed:', error);
-        setCurrentPage('splash');
-        setIsLoading(false);
+      // Navigate based on auth state
+      if (userData) {
+        navigate('/dashboard');
+      } else if (verifiedEmail) {
+        navigate('/profile');
+      } else {
+        navigate('/verification');
       }
-    };
 
-    checkAuth();
-  }, []);
+      setShowSplash(false);
+    }, 2000); // Show splash for 2 seconds
 
-  // Navigation handlers
-  const goToVerification = () => setCurrentPage('verification');
-  const goToProfile = () => setCurrentPage('profile');
-  const goToHome = () => setCurrentPage('home');
+    return () => clearTimeout(timer);
+  }, [navigate]);
 
-  // Handler for when verification is complete
+  return <Splash />;
+};
+
+// Protected Route component
+const ProtectedRoute = ({ element }) => {
+  const isAuthenticated = localStorage.getItem('marsogramUser') !== null;
+
+  if (!isAuthenticated) {
+    return <Navigate to="/verification" replace />;
+  }
+
+  return element;
+};
+
+// Handler for verification completion
+const VerificationWrapper = () => {
+  const navigate = useNavigate();
+
   const handleVerificationComplete = (email) => {
+    // Save verified status and isauth flag to localStorage
     localStorage.setItem('marsogramVerified', email);
-    goToProfile();
+    localStorage.setItem('marsogramIsAuth', 'true');
+    navigate('/profile');
   };
 
-  // Handler for when profile is complete
+  return <VerificationSystem onComplete={handleVerificationComplete} />;
+};
+
+// Handler for profile completion
+const ProfileWrapper = () => {
+  const navigate = useNavigate();
+
   const handleProfileComplete = (userData) => {
     localStorage.setItem('marsogramUser', JSON.stringify(userData));
-    goToHome();
+
+    // Прямое перенаправление на dashboard
+    navigate('/dashboard');
   };
 
-  // Display appropriate page based on state
-  const renderPage = () => {
-    if (isLoading) {
-      // You could show a loading spinner here
-      return <Splash />;
-    }
+  return <ProfileCompletion onComplete={handleProfileComplete} />;
+};
 
-    switch (currentPage) {
-      case 'splash':
-        return <Splash onGetStarted={goToVerification} />;
-      case 'verification':
-        return <VerificationSystem onComplete={handleVerificationComplete} />;
-      case 'profile':
-        return <ProfileCompletion onComplete={handleProfileComplete} />;
-      case 'home':
-        return <div className="flex items-center justify-center h-screen bg-purple-100">
-          <div className="bg-white p-8 rounded-xl shadow-lg">
-            <h1 className="text-2xl font-bold text-purple-600 mb-4">Welcome to Marsogram!</h1>
-            <p>You've successfully registered and completed your profile.</p>
-            <button
-              className="mt-4 bg-purple-600 text-white px-4 py-2 rounded-lg"
-              onClick={() => {
-                // Clear auth data and go to splash
-                localStorage.removeItem('marsogramUser');
-                localStorage.removeItem('marsogramVerified');
-                localStorage.removeItem('marsogramEmail');
-                setCurrentPage('splash');
-              }}
-            >
-              Logout
-            </button>
-          </div>
-        </div>;
-      default:
-        return <Splash onGetStarted={goToVerification} />;
-    }
-  };
-
+const App = () => {
   return (
-    <div className="min-h-screen bg-purple-100">
-      {renderPage()}
-    </div>
+    <>
+
+      {/* <CustomRoutes/> */}
+
+
+
+
+
+
+      <Router>
+        <Routes>
+          {/* Root path shows splash screen and then redirects */}
+          <Route path="/" element={<SplashWrapper />} />
+
+          {/* Verification screen */}
+          <Route path="/verification" element={<VerificationWrapper />} />
+
+          {/* Profile completion screen */}
+          <Route path="/profile" element={<ProfileWrapper />} />
+
+          {/* Dashboard (protected) */}
+          <Route path="/dashboard" element={<ProtectedRoute element={<Dashboard />} />} >
+          </Route>
+
+          {/* 404 Not Found page for invalid routes */}
+          <Route path="/404" element={<NotFoundPage />} />
+
+          {/* Catch all unknown routes and redirect to 404 page */}
+          <Route path="*" element={<Navigate to="/404" replace />} />
+        </Routes>
+      </Router>
+
+
+
+    </>
   );
 };
 

@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 
-const ProfileCompletion = () => {
+const ProfileCompletion = ({ onComplete }) => {
+    const navigate = useNavigate(); // React Router hook для перенаправления
     const [username, setUsername] = useState('');
     const [fullName, setFullName] = useState('');
+    const [phoneNumber, setPhoneNumber] = useState('');
     const [avatar, setAvatar] = useState(null);
     const [previewUrl, setPreviewUrl] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -59,6 +62,7 @@ const ProfileCompletion = () => {
             const formData = new FormData();
             formData.append('username', username);
             formData.append('name', fullName);
+            formData.append('phoneNumber', phoneNumber);
             formData.append('avatar', avatar);
 
             // First upload the image
@@ -74,45 +78,43 @@ const ProfileCompletion = () => {
                 body: JSON.stringify({
                     username: username,
                     name: fullName,
+                    phoneNumber: phoneNumber,
                     avatar: previewUrl, // In a real app, this would be the URL returned from image upload
                 }),
             });
 
             const data = await response.json();
-            console.log('API response:', data); // Debug response
 
             if (response.ok) {
                 setMessage('Profile completed successfully!');
                 setMessageType('success');
 
-                // Save user data to localStorage including the user ID
-                // Handle MongoDB _id format from your backend
-                const userId = data.user?._id || data.user?.id;
-
-                localStorage.setItem('marsogramUser', JSON.stringify({
-                    id: userId, // Save the user ID from the response
+                // Save user data to localStorage
+                const userData = {
                     username,
                     name: fullName,
+                    phoneNumber,
                     avatar: previewUrl,
-                }));
-
-                // Also save the user ID separately if needed for other components
-                localStorage.setItem('marsogramUserId', userId);
-
-                // Set dashboard redirect flag
-                localStorage.setItem('redirectToDashboard', 'true');
-
-                // Redirect to dashboard after a short delay to show success message
+                };
+                
+                localStorage.setItem('marsogramUser', JSON.stringify(userData));
+                
+                // Показываем сообщение об успехе на короткое время
                 setTimeout(() => {
-                    // Redirect to dashboard
-                    window.location.href = '/dashboard';
-                }, 1000);
+                    // Прямое перенаправление на dashboard (без обновления страницы)
+                    navigate('/dashboard');
+                    
+                    // Если используете onComplete пропс
+                    if (onComplete && typeof onComplete === 'function') {
+                        onComplete(userData);
+                    }
+                }, 1000); // Задержка 1 секунда, чтобы пользователь увидел сообщение об успехе
             } else {
                 setMessage(data.message || 'Failed to complete profile');
                 setMessageType('error');
             }
         } catch (error) {
-            console.error('Profile completion error:', error);
+            console.error("Profile completion error:", error);
             setMessage('Network error. Please try again.');
             setMessageType('error');
         } finally {
@@ -120,9 +122,10 @@ const ProfileCompletion = () => {
         }
     };
 
-    // If "Next Step" button is clicked after profile is completed successfully
-    const goToDashboard = () => {
-        window.location.href = '/dashboard';
+    // Функция для кнопки Next Step при успешном заполнении профиля
+    const handleNextStep = () => {
+        // Прямое перенаправление на dashboard
+        navigate('/dashboard');
     };
 
     return (
@@ -229,6 +232,8 @@ const ProfileCompletion = () => {
                                         className="w-full px-4 py-3 pl-10 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
                                         type="tel"
                                         placeholder="+XX XXX-XXX-XXXX"
+                                        value={phoneNumber}
+                                        onChange={(e) => setPhoneNumber(e.target.value)}
                                     />
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
@@ -244,11 +249,11 @@ const ProfileCompletion = () => {
                                 </div>
                             )}
 
-                            {/* Conditional rendering based on success state */}
+                            {/* If profile is already completed successfully, show different button behavior */}
                             {messageType === 'success' ? (
                                 <button
                                     type="button"
-                                    onClick={goToDashboard}
+                                    onClick={handleNextStep}
                                     className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50"
                                 >
                                     Next Step

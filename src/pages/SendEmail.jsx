@@ -129,6 +129,10 @@ const VerificationSystem = ({ onComplete }) => {
                     box.classList.add('verified');
                 });
                 
+                // Save auth data to localStorage
+                localStorage.setItem('marsogramIsAuth', 'true');
+                localStorage.setItem('marsogramVerified', email);
+                
                 // Call onComplete callback if provided
                 if (onComplete && typeof onComplete === 'function') {
                     setTimeout(() => {

@@ -4,8 +4,10 @@ import Splash from './pages/Splash';
 import VerificationSystem from './pages/SendEmail';
 import ProfileCompletion from './pages/CompleteRegister';
 import Dashboard from './pages/Dashboard';
+import ChatPage from './pages/ChatPage';
+import About from './pages/About';
+import Settings from './pages/Settings';
 import NotFoundPage from './pages/NotfoundPage';
-import CustomRoutes from './routes/CustomRoutes';
 
 // Splash screen wrapper that shows splash for a specified time then redirects
 const SplashWrapper = () => {
@@ -71,7 +73,7 @@ const ProfileWrapper = () => {
   const handleProfileComplete = (userData) => {
     localStorage.setItem('marsogramUser', JSON.stringify(userData));
 
-    // Прямое перенаправление на dashboard
+    // Direct redirect to dashboard
     navigate('/dashboard');
   };
 
@@ -80,41 +82,30 @@ const ProfileWrapper = () => {
 
 const App = () => {
   return (
-    <>
+    <Router>
+      <Routes>
+        {/* Root path shows splash screen and then redirects */}
+        <Route path="/" element={<SplashWrapper />} />
 
-      {/* <CustomRoutes/> */}
+        {/* Verification screen */}
+        <Route path="/verification" element={<VerificationWrapper />} />
 
+        {/* Profile completion screen */}
+        <Route path="/profile" element={<ProfileWrapper />} />
 
+        {/* Protected Routes */}
+        <Route path="/dashboard" element={<ProtectedRoute element={<Dashboard />} />} />
+        <Route path="/chats" element={<ProtectedRoute element={<ChatPage />} />} />
+        <Route path="/about" element={<ProtectedRoute element={<About />} />} />
+        <Route path="/settings" element={<ProtectedRoute element={<Settings />} />} />
 
+        {/* 404 Not Found page for invalid routes */}
+        <Route path="/404" element={<NotFoundPage />} />
 
-
-
-      <Router>
-        <Routes>
-          {/* Root path shows splash screen and then redirects */}
-          <Route path="/" element={<SplashWrapper />} />
-
-          {/* Verification screen */}
-          <Route path="/verification" element={<VerificationWrapper />} />
-
-          {/* Profile completion screen */}
-          <Route path="/profile" element={<ProfileWrapper />} />
-
-          {/* Dashboard (protected) */}
-          <Route path="/dashboard" element={<ProtectedRoute element={<Dashboard />} />} >
-          </Route>
-
-          {/* 404 Not Found page for invalid routes */}
-          <Route path="/404" element={<NotFoundPage />} />
-
-          {/* Catch all unknown routes and redirect to 404 page */}
-          <Route path="*" element={<Navigate to="/404" replace />} />
-        </Routes>
-      </Router>
-
-
-
-    </>
+        {/* Catch all unknown routes and redirect to 404 page */}
+        <Route path="*" element={<Navigate to="/404" replace />} />
+      </Routes>
+    </Router>
   );
 };
 

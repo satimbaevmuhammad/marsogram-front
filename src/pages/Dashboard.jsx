@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
@@ -9,126 +9,145 @@ const Dashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // Load user data from localStorage
-    const userData = JSON.parse(localStorage.getItem('marsogramUser') || 'null');
-    const userId = localStorage.getItem('marsogramUserId');
-    
-    if (userData) {
-      setUser({...userData, id: userId});
-    }
+  console.log('Dashboard component rendered'); // Debug
 
-    // Fetch users from API
-    fetchUsers();
+  useEffect(() => {
+    console.log('Dashboard useEffect triggered'); // Debug
+    
+    try {
+      // Load user data from localStorage
+      const userData = JSON.parse(localStorage.getItem('marsogramUser') || 'null');
+      const userId = localStorage.getItem('marsogramUserId');
+      console.log('User data loaded:', userData, userId); // Debug
+
+      if (userData) {
+        setUser({ ...userData, id: userId });
+      }
+
+      // Fetch users from API - простой вариант без cache
+      fetchUsers();
+    } catch (err) {
+      console.error('Error in useEffect:', err);
+      setError('Failed to initialize dashboard');
+    }
   }, []);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
+    console.log('fetchUsers called'); // Debug
+    
     try {
       setLoading(true);
+      setError(null);
+      
+      console.log('Making API request...'); // Debug
       const response = await fetch('https://marsogramm-back-5.onrender.com/api/auth/users');
+      
+      console.log('API response status:', response.status); // Debug
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch users');
+        throw new Error(`HTTP ${response.status}: Failed to fetch users`);
       }
+      
       const data = await response.json();
+      console.log('API data received:', data); // Debug
       
       // Filter out current user
       const currentUserId = localStorage.getItem('marsogramUserId');
       const filteredUsers = data.filter(u => u._id !== currentUserId);
       
+      console.log('Filtered users:', filteredUsers); // Debug
       setUsers(filteredUsers);
+      
     } catch (err) {
+      console.error('fetchUsers error:', err); // Debug
       setError(err.message);
     } finally {
       setLoading(false);
+      console.log('fetchUsers completed'); // Debug
     }
-  };
+  }, []);
 
-  const handleLogout = () => {
-    // Clear auth data and reload page to restart the auth flow
+  const handleLogout = useCallback(() => {
+    console.log('Logout triggered'); // Debug
+    
     const keysToRemove = [
       'marsogramUser',
       'marsogramVerified',
-      'marsogramEmail', 
+      'marsogramEmail',
       'marsogramIsAuth',
       'marsogramUserId',
       'selectedChatUser'
     ];
-    
+
     keysToRemove.forEach(key => {
       localStorage.removeItem(key);
     });
-    
-    window.location.reload();
-  };
 
-  const handleUserClick = async (selectedUser) => {
+    window.location.reload();
+  }, []);
+
+  const handleUserClick = useCallback((selectedUser) => {
+    console.log('User clicked:', selectedUser); // Debug
+    
     try {
       // Store selected user for messaging
       localStorage.setItem('selectedChatUser', JSON.stringify(selectedUser));
-      
+
       // Get current user ID from localStorage
       const currentUserId = localStorage.getItem('marsogramUserId');
-      
+
       if (!currentUserId) {
         console.error('Current user ID not found');
         return;
       }
 
-      // Send initial greeting message (optional)
-      const chatData = {
-        senderId: currentUserId,
-        receiverId: selectedUser._id,
-        message: `Salom, ${getDisplayName(selectedUser)}!`
-      };
-
-      try {
-        // Send initial message to create chat
-        const response = await fetch('https://marsogramm-back-5.onrender.com/api/messages/send', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(chatData)
-        });
-
-        if (response.ok) {
-          console.log('Initial message sent successfully');
-        }
-      } catch (messageError) {
-        console.log('Failed to send initial message, but proceeding to chat:', messageError);
-      }
-
-      // Navigate to chat page
+      console.log('Navigating to /chats'); // Debug
       navigate('/chats');
-      
+
     } catch (error) {
       console.error('Error initiating chat:', error);
     }
-  };
+  }, [navigate]);
 
-  const getDisplayName = (user) => {
-    return user.name || user.username.split('@')[0];
-  };
+  const getDisplayName = useCallback((user) => {
+    if (!user) return 'Unknown';
+    return user.name || user.username?.split('@')[0] || 'Unknown User';
+  }, []);
 
-  const getAvatarUrl = (user) => {
-    // Use user avatar if available, otherwise use a placeholder
-    return user.avatar && user.avatar.startsWith('blob:') 
-      ? `https://ui-avatars.com/api/?name=${encodeURIComponent(getDisplayName(user))}&background=6366f1&color=fff`
-      : user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(getDisplayName(user))}&background=6366f1&color=fff`;
-  };
+  const getAvatarUrl = useCallback((user) => {
+    if (!user) return '';
+    
+    const displayName = getDisplayName(user);
+    
+    if (user.avatar && !user.avatar.startsWith('blob:')) {
+      return user.avatar;
+    }
+    
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=6366f1&color=fff`;
+  }, [getDisplayName]);
 
-  const getOnlineStatus = () => {
-    // Random online status for demo purposes
+  const getOnlineStatus = useCallback(() => {
     return Math.random() > 0.6;
-  };
+  }, []);
 
   // Filter users based on search term
-  const filteredUsers = users.filter(userData => {
-    const displayName = getDisplayName(userData).toLowerCase();
-    const username = userData.username.toLowerCase();
+  const filteredUsers = useMemo(() => {
+    console.log('Filtering users, search term:', searchTerm); // Debug
+    
+    if (!searchTerm.trim()) return users;
+    
     const search = searchTerm.toLowerCase();
-    return displayName.includes(search) || username.includes(search);
-  });
+    const filtered = users.filter(userData => {
+      const displayName = getDisplayName(userData).toLowerCase();
+      const username = userData.username?.toLowerCase() || '';
+      return displayName.includes(search) || username.includes(search);
+    });
+    
+    console.log('Filtered result:', filtered); // Debug
+    return filtered;
+  }, [users, searchTerm, getDisplayName]);
+
+  console.log('Current state:', { loading, error, users: users.length, filteredUsers: filteredUsers.length }); // Debug
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100">
@@ -139,14 +158,14 @@ const Dashboard = () => {
           {user && (
             <div className="flex items-center">
               <div className="w-8 h-8 rounded-full overflow-hidden mr-2">
-                <img 
-                  src={getAvatarUrl(user)} 
-                  alt="User" 
-                  className="w-full h-full object-cover" 
+                <img
+                  src={getAvatarUrl(user)}
+                  alt="User"
+                  className="w-full h-full object-cover"
                 />
               </div>
               <span className="mr-3 text-sm">{getDisplayName(user)}</span>
-              <button 
+              <button
                 onClick={handleLogout}
                 className="text-sm bg-indigo-700 px-3 py-1 rounded-md hover:bg-indigo-800 transition-colors"
               >
@@ -157,6 +176,14 @@ const Dashboard = () => {
         </div>
       </header>
 
+      {/* Debug Info */}
+      <div className="bg-yellow-100 p-2 text-xs">
+        <strong>Debug:</strong> Loading: {loading.toString()}, 
+        Error: {error || 'none'}, 
+        Users: {users.length}, 
+        Filtered: {filteredUsers.length}
+      </div>
+
       {/* Search Bar */}
       <div className="container mx-auto px-4 py-3">
         <div className="relative">
@@ -164,7 +191,10 @@ const Dashboard = () => {
             type="text"
             placeholder="Search users..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              console.log('Search changed:', e.target.value); // Debug
+              setSearchTerm(e.target.value);
+            }}
             className="w-full py-2 pl-10 pr-4 rounded-full bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -185,18 +215,22 @@ const Dashboard = () => {
             </span>
           )}
         </h2>
-        
+
         {loading && (
           <div className="flex justify-center items-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            <span className="ml-2">Loading users...</span>
           </div>
         )}
 
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            Error: {error}
-            <button 
-              onClick={fetchUsers}
+            <strong>Error:</strong> {error}
+            <button
+              onClick={() => {
+                console.log('Retry clicked'); // Debug
+                fetchUsers();
+              }}
               className="ml-2 text-sm underline hover:no-underline"
             >
               Retry
@@ -205,20 +239,26 @@ const Dashboard = () => {
         )}
 
         <div className="space-y-3">
-          {filteredUsers.map((userData) => {
+          {filteredUsers.map((userData, index) => {
+            console.log('Rendering user:', userData); // Debug
             const isOnline = getOnlineStatus();
+            
             return (
-              <div 
-                key={userData._id} 
+              <div
+                key={userData._id || index}
                 className="flex items-center bg-white p-3 rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer hover:bg-gray-50"
                 onClick={() => handleUserClick(userData)}
               >
                 <div className="relative">
                   <div className="w-12 h-12 rounded-xl overflow-hidden mr-3">
-                    <img 
-                      src={getAvatarUrl(userData)} 
-                      alt={getDisplayName(userData)} 
-                      className="w-full h-full object-cover" 
+                    <img
+                      src={getAvatarUrl(userData)}
+                      alt={getDisplayName(userData)}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.log('Avatar load error for:', userData); // Debug
+                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(getDisplayName(userData))}&background=6366f1&color=fff`;
+                      }}
                     />
                   </div>
                   {isOnline && (
@@ -233,7 +273,7 @@ const Dashboard = () => {
                     </span>
                   </div>
                   <p className="text-sm text-gray-500 truncate">
-                    {userData.username}
+                    {userData.username || 'No username'}
                   </p>
                 </div>
                 <div className="ml-2">
@@ -250,7 +290,7 @@ const Dashboard = () => {
           <div className="text-center py-8 text-gray-500">
             {searchTerm ? `No users found matching "${searchTerm}"` : 'No users found'}
             {searchTerm && (
-              <button 
+              <button
                 onClick={() => setSearchTerm('')}
                 className="block mx-auto mt-2 text-indigo-600 text-sm hover:underline"
               >
